@@ -15,18 +15,6 @@ import "@chainlink/contracts/src/v0.8/ConfirmedOwner.sol";
  * THIS IS AN EXAMPLE CONTRACT THAT USES HARDCODED VALUES FOR CLARITY.
  * THIS IS AN EXAMPLE CONTRACT THAT USES UN-AUDITED CODE.
  * DO NOT USE THIS CODE IN PRODUCTION.
- BSC:
- Item	Value
-LINK Token	0x84b9B910527Ad5C03A9Ca831909E21e236EA7b06 Switch network and add to wallet
-VRF Coordinator	0x6A2AAd07396B36Fe02a22b33cf443582f682c82f
-50 gwei Key Hash	0xd4bb89654db74673a187bd804519e65e3f71a52bc55f11da7601a13dcf505314
-Premium	0.005 LINK
-Max Gas Limit	2,500,000
-Minimum Confirmations	3
-Maximum Confirmations	200
-Maximum Random Values	500
-
-LAST DEPLOY
  */
  interface ILotery{
     function finishPlay(uint[] memory _randomRequest) external;
@@ -57,7 +45,7 @@ contract RandomGenerator is VRFConsumerBaseV2, ConfirmedOwner {
     // For a list of available gas lanes on each network,
     // see https://docs.chain.link/docs/vrf/v2/subscription/supported-networks/#configurations
     bytes32 keyHash =
-        0xd4bb89654db74673a187bd804519e65e3f71a52bc55f11da7601a13dcf505314;
+        0x4b09e658ed251bcafeebbc69400383d49f344ace09b9576fe248bb02c003fe9f;
 
     // Depends on the number of requested values that you want sent to the
     // fulfillRandomWords() function. Storing each word costs about 20,000 gas,
@@ -81,11 +69,11 @@ contract RandomGenerator is VRFConsumerBaseV2, ConfirmedOwner {
     constructor(
         uint64 subscriptionId
     )
-        VRFConsumerBaseV2(0x6A2AAd07396B36Fe02a22b33cf443582f682c82f)
+        VRFConsumerBaseV2(0x7a1BaC17Ccc5b313516C5E16fb24f7659aA5ebed)
         ConfirmedOwner(msg.sender)
     {
         COORDINATOR = VRFCoordinatorV2Interface(
-            	0x6A2AAd07396B36Fe02a22b33cf443582f682c82f
+            	0x7a1BaC17Ccc5b313516C5E16fb24f7659aA5ebed
         );
         s_subscriptionId = subscriptionId;
     }
