@@ -5,11 +5,13 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./utils/RandomGenerator.sol";
 
-// TODO:  Integrar swaps
+// todo: constructor de stable fee y stable price, random, caller=msg.sender, -- view function to winnersNumbers.
 contract Lotery is Ownable{
 
   uint public ticketCost;
   uint public actualNumber = 1; 
+  uint public minNumber = 5;
+  uint public loteryCounter; 
 
   uint public stableFee; //in percernt  
   uint public stablePrice; // in percent
@@ -25,7 +27,7 @@ contract Lotery is Ownable{
   uint[] public percentForWiners;
   uint32 public cantOfNumbers = 3; //cant of winers per gift
   bool public withStable = true;
-  bool public whiteList;
+  bool public whiteList = true;
 
   address caller;
   address manager = msg.sender;
@@ -36,10 +38,11 @@ contract Lotery is Ownable{
   RandomGenerator public vrf;
   mapping(uint => address) public numberOwner;
   mapping(address=>uint) public referralsBuys;
+  mapping(address=>uint) public referralsAmount;
   mapping(address=>address) public referrer;
 
   event BuyNumber(uint number, address buyer, address ref);
-  event Winners(uint[] winNumbers, address[] winners);
+  event Winners(uint[] winNumbers,uint[] randomNumbers,address[] winners);
  
   constructor ( uint _ticketCost){     
     ticketCost = _ticketCost;
@@ -61,6 +64,7 @@ contract Lotery is Ownable{
     if(newReferrer != msg.sender){
       ref=referralSystem(newReferrer);
     }
+
     if(withStable){
       totalPrice = totalPrice + (ticketCost * stablePrice) / 100;
       totalFee = totalFee + (ticketCost * stableFee) / 100;      
@@ -82,6 +86,7 @@ contract Lotery is Ownable{
 
   function selectNumbers() public {
     require(msg.sender == caller, "You dont are de caller");    
+    require(actualNumber > minNumber);
     vrf.requestRandomWords(cantOfNumbers);
   }
 
@@ -90,20 +95,21 @@ contract Lotery is Ownable{
     winersNumbers = randomNumber;    
     winersVerifications(randomNumber);
    
-   //Contorlar resultados repetidos
-    for(uint i; i < randomNumber.length; i++){       
-      priceCoin.transfer( LastAddressWiners[i], winAmount(i));
+    for(uint i; i < LastAddressWiners.length; i++){       
+      priceCoin.transfer(LastAddressWiners[i], winAmount(i));
     }
 
     actualNumber = 1;
-    emit Winners(winersNumbers, LastAddressWiners);
+    loteryCounter++;
+    emit Winners(winersNumbers,randomNumber, LastAddressWiners);
   }
 
+  // winners mustn't be repeated (with number or address)
   function winersVerifications(uint[] memory randomNumber) internal {
     delete LastAddressWiners;
     
     for(uint i; i < randomNumber.length; i++){
-       uint subWinerNumber = (randomNumber[i] % actualNumber) + 1 ;
+      uint subWinerNumber = (randomNumber[i] % actualNumber) + 1 ;
       //first number enther in Winumbers and save the winner addres in an  array
       if(i == 0){ 
         winersNumbers[i] = subWinerNumber ; 
@@ -115,17 +121,17 @@ contract Lotery is Ownable{
             if (subWinerNumber == actualNumber){ subWinerNumber == 0; }
             subWinerNumber++;
             j = 0; //Reset loop to check the new number 
-          }
-          
-          if( winersNumbers[0] == subWinerNumber ){
-            subWinerNumber++;
-          }
+          }          
 
           if( LastAddressWiners[j] == numberOwner[subWinerNumber]){
             if (subWinerNumber == actualNumber){ subWinerNumber == 0; }
             subWinerNumber++;
             j = 0;
           }          
+
+          if( winersNumbers[0] == subWinerNumber || LastAddressWiners[0] == numberOwner[subWinerNumber]){
+            subWinerNumber++;
+          }
         }
         winersNumbers[i]=subWinerNumber;
         LastAddressWiners.push(numberOwner[winersNumbers[i]]);
@@ -152,6 +158,10 @@ contract Lotery is Ownable{
     return list;
   }
 
+  function viewLastAddressWiners() public view returns(address[] memory){
+    return LastAddressWiners;
+  }
+
   function withDrawhticketCoins() public  onlyOwner{
     ticketCoin.transfer(msg.sender, ticketCoin.balanceOf(address(this)));
   }
@@ -174,12 +184,15 @@ contract Lotery is Ownable{
     stablePrice = 100-newStableFee;
   }
 
+  function setMinNumber(uint newMinNumber)public onlyOwner{
+    minNumber = newMinNumber;
+  }
+
   // internal functions
   function _newTiket(address tiketFor) public {
-    numberOwner[actualNumber] = tiketFor;
-    
+    numberOwner[actualNumber] = tiketFor;    
     actualNumber++;
-  }
+  }  
 
   //function de comprar voleto automatico para referentes
   function referralSystem(address newReferrer) public returns(address){
@@ -189,12 +202,14 @@ contract Lotery is Ownable{
       if(newReferrer != address(0) ){
         referrer[msg.sender] = newReferrer;
         referralsBuys[newReferrer]++;
+        referralsAmount[newReferrer]++;
         RealReferrer = newReferrer;
       }
     }else{
       referralsBuys[RealReferrer]++;
+      referralsAmount[RealReferrer]++;
     }
-//why this dont work?
+    //why this dont work?
     if((referralsBuys[RealReferrer] == 3) || (referralsBuys[newReferrer] == 3) ){
      _newTiket( RealReferrer); 
      delete referralsBuys[RealReferrer];
