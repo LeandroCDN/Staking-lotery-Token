@@ -5,28 +5,22 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./utils/RandomGenerator.sol";
 
-// todo: constructor de stable fee y stable price, random, caller=msg.sender, -- view function to winnersNumbers.
 contract Lotery is Ownable{
 
   uint public ticketCost;
   uint public actualNumber = 1; 
   uint public minNumber = 5;
   uint public loteryCounter; 
+  uint public cantOfAddress;
 
   uint public stableFee; //in percernt  
   uint public stablePrice; // in percent
-
-  uint public teamFee = 160; // 16%
-  uint public pricePercent = 420; //42%
-  uint public burnPercent = 420; //42%
-
   uint public totalPrice;
   uint public totalFee;
 
   uint[] public winersNumbers; 
   uint[] public percentForWiners;
   uint32 public cantOfNumbers = 3; //cant of winers per gift
-  bool public withStable = true;
   bool public whiteList = true;
 
   address caller;
@@ -34,59 +28,53 @@ contract Lotery is Ownable{
   address[] public LastAddressWiners; 
   address[] list;
   IERC20 public ticketCoin;
-  IERC20 public priceCoin;
   RandomGenerator public vrf;
-  mapping(uint => address) public numberOwner;
+  mapping(uint => address) public ownerOfTiket;
   mapping(address=>uint) public referralsBuys;
   mapping(address=>uint) public referralsAmount;
   mapping(address=>address) public referrer;
+  mapping(address=>bool) public referrerSpecialList;
+  mapping(address=>uint) public referrerSpecialListAmount;
+  mapping(uint=>mapping(address=>bool)) public listOfBuyers;
 
   event BuyNumber(uint number, address buyer, address ref);
-  event Winners(uint[] winNumbers,uint[] randomNumbers,address[] winners);
+  event Winners(uint[] winNumbers,address[] winners);
  
-  constructor ( uint _ticketCost){     
+  constructor ( 
+    uint _ticketCost,
+    uint _stableFee,
+    RandomGenerator _RandomGenerator,
+    IERC20 _ticketCoin
+    ){     
     ticketCost = _ticketCost;
-  }
-
-  function setticketCoin(IERC20 _ticketCoin, IERC20 _priceCoin) public onlyOwner{
+    caller = msg.sender;
     ticketCoin = _ticketCoin;
-    priceCoin = _priceCoin;
-  }
-
-  function setVRF(RandomGenerator _vrf) public onlyOwner{
-    vrf = _vrf;
-  }
+    setStableFee(_stableFee);
+    vrf = _RandomGenerator;
+  }  
 
   function buyNumber(address newReferrer) public {
     ticketCoin.transferFrom(msg.sender, address(this), ticketCost);
     _newTiket( msg.sender);
     address ref;
+
     if(newReferrer != msg.sender){
       ref=referralSystem(newReferrer);
+    }else{
+      totalFee = totalFee + (ticketCost * (stableFee) ) / 100;
     }
 
-    if(withStable){
-      totalPrice = totalPrice + (ticketCost * stablePrice) / 100;
-      totalFee = totalFee + (ticketCost * stableFee) / 100;      
-    }
+    totalPrice = totalPrice + (ticketCost * stablePrice) / 100;        
+    whiteLister();
+    countAddress();
 
-    if(whiteList){
-      bool inList;
-      for(uint i; i < list.length; i++){
-        if(list[i]==msg.sender){
-          inList = true;
-        }
-      }
-      if(!inList){
-        list.push(msg.sender);
-      }
-    }
     emit BuyNumber(actualNumber-1, msg.sender, ref);
   }
 
   function selectNumbers() public {
     require(msg.sender == caller, "You dont are de caller");    
     require(actualNumber > minNumber);
+    require(cantOfAddress > cantOfNumbers);
     vrf.requestRandomWords(cantOfNumbers);
   }
 
@@ -96,74 +84,55 @@ contract Lotery is Ownable{
     winersVerifications(randomNumber);
    
     for(uint i; i < LastAddressWiners.length; i++){       
-      priceCoin.transfer(LastAddressWiners[i], winAmount(i));
+      ticketCoin.transfer(LastAddressWiners[i], winAmount(i));
     }
 
     actualNumber = 1;
     loteryCounter++;
-    emit Winners(winersNumbers,randomNumber, LastAddressWiners);
+    delete cantOfAddress;
+    emit Winners(winersNumbers, LastAddressWiners);
   }
 
-  // winners mustn't be repeated (with number or address)
+  // winners mustn't be repeated 
   function winersVerifications(uint[] memory randomNumber) internal {
-    delete LastAddressWiners;
-    
+    delete LastAddressWiners;    
     for(uint i; i < randomNumber.length; i++){
       uint subWinerNumber = (randomNumber[i] % actualNumber) + 1 ;
-      //first number enther in Winumbers and save the winner addres in an  array
+      
       if(i == 0){ 
         winersNumbers[i] = subWinerNumber ; 
-        LastAddressWiners.push(numberOwner[winersNumbers[i]]);
+        LastAddressWiners.push(ownerOfTiket[winersNumbers[i]]);
       }
       else{
-        for(uint j; j < i; j++){ 
-          if( winersNumbers[j] == subWinerNumber ){
-            if (subWinerNumber == actualNumber){ subWinerNumber == 0; }
-            subWinerNumber++;
-            j = 0; //Reset loop to check the new number 
-          }          
-
-          if( LastAddressWiners[j] == numberOwner[subWinerNumber]){
+        for(uint j; j < i; j++){                 
+          if( LastAddressWiners[j] == ownerOfTiket[subWinerNumber]){
             if (subWinerNumber == actualNumber){ subWinerNumber == 0; }
             subWinerNumber++;
             j = 0;
           }          
 
-          if( winersNumbers[0] == subWinerNumber || LastAddressWiners[0] == numberOwner[subWinerNumber]){
+          if(LastAddressWiners[0] == ownerOfTiket[subWinerNumber]){
             subWinerNumber++;
           }
         }
         winersNumbers[i]=subWinerNumber;
-        LastAddressWiners.push(numberOwner[winersNumbers[i]]);
+        LastAddressWiners.push(ownerOfTiket[winersNumbers[i]]);
       }
     }    
-  }
+  }  
 
-  function toggleWhiteList() public onlyOwner{
-    whiteList = !whiteList;
-  }
-
-  // TODO > WIN AMOUNT view Function
-  function winAmount(uint i) public view returns(uint){
-    uint amount;
-    if(withStable){
-      amount = (totalPrice * percentForWiners[i]) / 100;
-    }else{
-      
-    }
-    return amount;
-  }
-
-  function viewWhiteList() public view returns(address[] memory){
-    return list;
-  }
-
-  function viewLastAddressWiners() public view returns(address[] memory){
-    return LastAddressWiners;
-  }
-
+  // ------------ Set FUNCTONS --------------
   function withDrawhticketCoins() public  onlyOwner{
-    ticketCoin.transfer(msg.sender, ticketCoin.balanceOf(address(this)));
+    ticketCoin.transfer(msg.sender, totalFee);
+    delete totalFee;
+  }
+
+  function setticketCoin(IERC20 _ticketCoin) public onlyOwner{
+    ticketCoin = _ticketCoin;
+  }
+
+  function setVRF(RandomGenerator _vrf) public onlyOwner{
+    vrf = _vrf;
   }
 
   function setCantOfNumbers(uint32 _cantOfNumbers) public onlyOwner{
@@ -184,18 +153,87 @@ contract Lotery is Ownable{
     stablePrice = 100-newStableFee;
   }
 
-  function setMinNumber(uint newMinNumber)public onlyOwner{
+  function setMinNumber(uint newMinNumber) public onlyOwner{
     minNumber = newMinNumber;
   }
 
-  // internal functions
-  function _newTiket(address tiketFor) public {
-    numberOwner[actualNumber] = tiketFor;    
+  function setSpecialReferrers(address addressOfReferrer, uint amount) public onlyOwner{
+    require(amount <= stableFee, "Amount is to high");
+    referrerSpecialList[addressOfReferrer] = true;
+    referrerSpecialListAmount[addressOfReferrer] = amount;
+  }
+
+  function toggleWhiteList() public onlyOwner{
+    whiteList = !whiteList;
+  }
+
+  function deleteSpecialReferrers(address addressOfReferrer)public onlyOwner{
+    delete referrerSpecialList[addressOfReferrer];
+    delete referrerSpecialListAmount[addressOfReferrer];
+  }
+
+  // ------------ VIEW FUNCTONS --------------
+
+  function winAmount(uint i) public view returns(uint){   
+    return (totalPrice * percentForWiners[i]) / 100;  
+  }
+
+  function viewWhiteList() public view returns(address[] memory){
+    return list;
+  }
+
+  function viewLastAddressWiners() public view returns(address[] memory){
+    return LastAddressWiners;
+  }
+
+  // ------------ INTERNAL FUNCTONS --------------
+  function _newTiket(address tiketFor) internal {
+    ownerOfTiket[actualNumber] = tiketFor;    
     actualNumber++;
   }  
 
   //function de comprar voleto automatico para referentes
-  function referralSystem(address newReferrer) public returns(address){
+  function referralSystem(address newReferrer) internal returns(address){
+    address realReferrer = setReferrer(newReferrer);
+    uint fee = 5;
+    if(referrerSpecialList[realReferrer]){
+      fee = referrerSpecialListAmount[realReferrer];
+    }
+
+    totalFee = totalFee + (ticketCost * (stableFee-fee) ) / 100; 
+    ticketCoin.transfer(realReferrer, ((ticketCost*fee)/100));
+
+    //special list cant recive free tikets
+    if((referralsBuys[realReferrer] == 3) && !(referrerSpecialList[realReferrer])){
+     _newTiket( realReferrer); 
+     delete referralsBuys[realReferrer];
+    }
+
+    return realReferrer;
+  }
+
+  function whiteLister() internal {
+    if(whiteList){
+      bool inList;
+      for(uint i; i < list.length; i++){
+        if(list[i]==msg.sender){
+          inList = true;
+        }
+      }
+      if(!inList){
+        list.push(msg.sender);
+      }
+    }
+  }
+
+  function countAddress() internal {
+    if(!listOfBuyers[loteryCounter][msg.sender]){
+      cantOfAddress++;
+      listOfBuyers[loteryCounter][msg.sender] = true;
+    }
+  }
+
+  function setReferrer(address newReferrer) internal returns(address){
     address RealReferrer = referrer[msg.sender];
 
     if(RealReferrer == address(0)){
@@ -208,11 +246,6 @@ contract Lotery is Ownable{
     }else{
       referralsBuys[RealReferrer]++;
       referralsAmount[RealReferrer]++;
-    }
-    //why this dont work?
-    if((referralsBuys[RealReferrer] == 3) || (referralsBuys[newReferrer] == 3) ){
-     _newTiket( RealReferrer); 
-     delete referralsBuys[RealReferrer];
     }
     return RealReferrer;
   }
