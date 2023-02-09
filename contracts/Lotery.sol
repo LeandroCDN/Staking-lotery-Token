@@ -2,31 +2,39 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./utils/RandomGenerator.sol";
 
-contract Lotery is Ownable{
+// implement historicalAomountprize
+// ownerOfTijet -> rivate, and make a function with require i < actualnumber
+contract Lotery is Ownable, Pausable{
 
   uint public ticketCost;
   uint public actualNumber = 1; 
   uint public minNumber = 5;
+  uint public minNumberOfAddress = 3;
   uint public loteryCounter; 
   uint public cantOfAddress;
 
   uint public stableFee; //in percernt  
-  uint public stablePrice; // in percent
-  uint public totalPrice;
+  uint public stablePrize; //in percent
+  uint public totalPrize;
+  uint public totalVolumeInPrize;
+  uint public totalTiketSell;
   uint public totalFee;
 
   uint[] public winersNumbers; 
   uint[] public percentForWiners;
-  uint32 public cantOfNumbers = 3; //cant of winers per gift
+  uint32 public cantOfNumbers = 5; //cant of winers per gift
   bool public whiteList = true;
 
-  address caller;
-  address manager = msg.sender;
+  address public caller;
+  address public manager = msg.sender;
+  address public house;
   address[] public LastAddressWiners; 
-  address[] list;
+  address[] public list;
+  address[] public topReferrers;
   IERC20 public ticketCoin;
   RandomGenerator public vrf;
   mapping(uint => address) public ownerOfTiket;
@@ -35,73 +43,102 @@ contract Lotery is Ownable{
   mapping(address=>address) public referrer;
   mapping(address=>bool) public referrerSpecialList;
   mapping(address=>uint) public referrerSpecialListAmount;
+  mapping(uint=>uint) public historicalTotalPrize; 
+  mapping(uint=>uint) public historicalTotalNumbers; 
+  mapping(uint=>uint[]) public historicalWinnerNumbers;
+  mapping(uint=>address[]) public historicalWinnerAddress;
+  mapping(uint=>mapping(address=>uint[])) public historicalTiketsOwner;
   mapping(uint=>mapping(address=>bool)) public listOfBuyers;
 
-  event BuyNumber(uint number, address buyer, address ref);
-  event Winners(uint[] winNumbers,address[] winners);
+  event BuyNumber(uint number, address buyer, address ref, uint _loteryCounter);
+  event Winners(uint loteryNumber, address[] winersNumbers, uint[] winners);
  
   constructor ( 
     uint _ticketCost,
     uint _stableFee,
+    address _house,
+    uint[] memory _percentForWiners,
     RandomGenerator _RandomGenerator,
     IERC20 _ticketCoin
     ){     
     ticketCost = _ticketCost;
     caller = msg.sender;
     ticketCoin = _ticketCoin;
+    house = _house;
     setStableFee(_stableFee);
     vrf = _RandomGenerator;
+    setPercentForWiners(_percentForWiners);
   }  
 
-  function buyNumber(address newReferrer) public {
+  function buyNumber(address newReferrer) public whenNotPaused {
     ticketCoin.transferFrom(msg.sender, address(this), ticketCost);
     _newTiket( msg.sender);
-    address ref;
+    address ref =  referrer[msg.sender];
 
-    if(newReferrer != msg.sender){
-      ref=referralSystem(newReferrer);
+    if(!(ref == address(0) && newReferrer == msg.sender)){
+      ref = referralSystem(newReferrer);
     }else{
       totalFee = totalFee + (ticketCost * (stableFee) ) / 100;
     }
 
-    totalPrice = totalPrice + (ticketCost * stablePrice) / 100;        
+    
+    totalPrize = totalPrize + (ticketCost * stablePrize) / 100;
+    
+    historicalTiketsOwner[loteryCounter][msg.sender].push(actualNumber-1);
     whiteLister();
     countAddress();
+    emit BuyNumber(actualNumber-1, msg.sender, ref, loteryCounter);
+  }
 
-    emit BuyNumber(actualNumber-1, msg.sender, ref);
+  function buyNumberBath(address newReferrer, uint cant )public whenNotPaused{
+    for(uint i; i < cant; i++){
+      buyNumber(newReferrer);
+    }
   }
 
   function selectNumbers() public {
     require(msg.sender == caller, "You dont are de caller");    
-    require(actualNumber > minNumber);
-    require(cantOfAddress > cantOfNumbers);
+    require(actualNumber >= minNumber, "actual number is down");
+    require(cantOfAddress > minNumberOfAddress, "need more diferents buyers");
     vrf.requestRandomWords(cantOfNumbers);
   }
 
   function finishPlay(uint[] memory randomNumber) public {
     require(msg.sender == address(vrf), "You dont are de caller");
-    winersNumbers = randomNumber;    
-    winersVerifications(randomNumber);
+    require(actualNumber >= minNumber, "actual number is down");
+    require(cantOfAddress > minNumberOfAddress, "need more diferents buyers");
+     
+    winersNumbers = winersVerifications(randomNumber);
    
     for(uint i; i < LastAddressWiners.length; i++){       
       ticketCoin.transfer(LastAddressWiners[i], winAmount(i));
     }
 
+    totalVolumeInPrize += totalPrize;
+    historicalWinnerNumbers[loteryCounter] = winersNumbers;
+    historicalWinnerAddress[loteryCounter] = LastAddressWiners;
+    historicalTotalNumbers[loteryCounter] = actualNumber;
+    historicalTotalPrize[loteryCounter] = totalPrize;
     actualNumber = 1;
     loteryCounter++;
+    ticketCoin.transfer(house, totalFee);
+    delete totalFee;
     delete cantOfAddress;
-    emit Winners(winersNumbers, LastAddressWiners);
+    delete totalPrize;
+    emit Winners(loteryCounter-1, viewLastAddressWiners(), viewWinerNumbers());
   }
 
   // winners mustn't be repeated 
-  function winersVerifications(uint[] memory randomNumber) internal {
-    delete LastAddressWiners;    
+  function winersVerifications(uint[] memory randomNumber) internal returns(uint[] memory){
+    delete LastAddressWiners; 
+    delete winersNumbers;
+    uint[]  memory subWinersNumbers = randomNumber;
     for(uint i; i < randomNumber.length; i++){
       uint subWinerNumber = (randomNumber[i] % actualNumber) + 1 ;
       
       if(i == 0){ 
-        winersNumbers[i] = subWinerNumber ; 
-        LastAddressWiners.push(ownerOfTiket[winersNumbers[i]]);
+        subWinersNumbers[i] = subWinerNumber ; 
+        LastAddressWiners.push(ownerOfTiket[subWinersNumbers[i]]);
       }
       else{
         for(uint j; j < i; j++){                 
@@ -114,18 +151,27 @@ contract Lotery is Ownable{
           if(LastAddressWiners[0] == ownerOfTiket[subWinerNumber]){
             subWinerNumber++;
           }
+          
         }
-        winersNumbers[i]=subWinerNumber;
-        LastAddressWiners.push(ownerOfTiket[winersNumbers[i]]);
+        subWinersNumbers[i]=subWinerNumber;
+        LastAddressWiners.push(ownerOfTiket[subWinersNumbers[i]]);
       }
     }    
+    return subWinersNumbers;
   }  
 
-  // ------------ Set FUNCTONS --------------
   function withDrawhticketCoins() public  onlyOwner{
-    ticketCoin.transfer(msg.sender, totalFee);
+    ticketCoin.transfer(house, totalFee);
     delete totalFee;
   }
+  // ------------ Set FUNCTONS --------------
+  function pause() public onlyOwner {
+        _pause();
+    }
+
+    function unpause() public onlyOwner {
+        _unpause();
+    }
 
   function setticketCoin(IERC20 _ticketCoin) public onlyOwner{
     ticketCoin = _ticketCoin;
@@ -150,11 +196,15 @@ contract Lotery is Ownable{
 
   function setStableFee(uint newStableFee) public onlyOwner{
     stableFee = newStableFee;
-    stablePrice = 100-newStableFee;
+    stablePrize = 100-newStableFee;
   }
 
   function setMinNumber(uint newMinNumber) public onlyOwner{
     minNumber = newMinNumber;
+  }
+
+  function setHouse(address _house) public onlyOwner{
+    house = _house;
   }
 
   function setSpecialReferrers(address addressOfReferrer, uint amount) public onlyOwner{
@@ -171,25 +221,105 @@ contract Lotery is Ownable{
     delete referrerSpecialList[addressOfReferrer];
     delete referrerSpecialListAmount[addressOfReferrer];
   }
-
+  function setMinNumberOfAddress(uint _minNumberOfAddress) public {
+    minNumberOfAddress = _minNumberOfAddress;
+  }
   // ------------ VIEW FUNCTONS --------------
 
   function winAmount(uint i) public view returns(uint){   
-    return (totalPrice * percentForWiners[i]) / 100;  
+    return (totalPrize * percentForWiners[i]) / 100;  
   }
 
-  function viewWhiteList() public view returns(address[] memory){
-    return list;
+  function viewWhiteListLength() public view returns(uint){
+    return list.length;
   }
 
   function viewLastAddressWiners() public view returns(address[] memory){
     return LastAddressWiners;
   }
 
+  function viewWinerNumbers() public view returns(uint[] memory){
+    return winersNumbers;
+  }
+
+  function viewLastWinersData() public view returns(uint[] memory, uint[] memory, address[] memory){
+    uint[] memory winAmountValue = viewWinerNumbers();
+    for(uint i; i < LastAddressWiners.length; i++){
+      winAmountValue[i] = (historicalTotalPrize[loteryCounter-1] * percentForWiners[i]) / 100;
+    }
+    return (viewWinerNumbers(),winAmountValue, viewLastAddressWiners());
+  }
+
+  function viewLotery() public view returns(uint[10] memory){
+    return([  
+            cantOfNumbers,
+            loteryCounter,
+            ticketCost,
+            cantOfAddress,
+            actualNumber,
+            totalPrize,
+            historicalTotalPrize[loteryCounter-1],
+            historicalTotalNumbers[loteryCounter-1],
+            totalVolumeInPrize,
+            totalTiketSell
+          ]
+          );
+  }
+  function viewLoteryData() public view returns(uint[10] memory, uint[30] memory ){
+    return([  
+            cantOfNumbers,
+            loteryCounter,
+            ticketCost,
+            cantOfAddress,
+            actualNumber,
+            totalPrize,
+            historicalTotalPrize[loteryCounter-1],
+            historicalTotalNumbers[loteryCounter-1],
+            totalVolumeInPrize,
+            totalTiketSell
+          ],
+          viewLastHistoricalTotalPrizes()
+          );
+  }
+
+  function viewReferralsData(address user) public view returns(bool,uint, uint, address, uint[] memory, uint[] memory  ){
+    return (
+      referrerSpecialList[user],
+      referrerSpecialListAmount[user],
+      referralsAmount[user],
+      referrer[user],
+      historicalTiketsOwner[loteryCounter][user],
+      historicalTiketsOwner[loteryCounter-1][user]    
+    );
+  }
+  
+  function viewTopReferresAndAmount() public view returns(address[] memory ,uint[5] memory ){
+    uint[5] memory topReferralsAmount;
+    for (uint i; i < 5; i++){
+      topReferralsAmount[i] = referralsAmount[topReferrers[i]];
+    }
+    return (topReferrers, topReferralsAmount);
+  }
+
+  function viewLastHistoricalTotalPrizes() public view returns(uint[30] memory){
+    uint[30] memory lastPrizes;
+    uint stop = 30;
+    if(loteryCounter < 30 ){      
+       stop = loteryCounter; 
+    }
+
+    for(uint i = 1 ; i <= stop; i++){
+      lastPrizes[i-1] = historicalTotalPrize[loteryCounter-i];
+    }
+    
+    return lastPrizes;
+  }  
+
   // ------------ INTERNAL FUNCTONS --------------
   function _newTiket(address tiketFor) internal {
     ownerOfTiket[actualNumber] = tiketFor;    
     actualNumber++;
+    totalTiketSell++;
   }  
 
   //function de comprar voleto automatico para referentes
@@ -207,6 +337,9 @@ contract Lotery is Ownable{
     if((referralsBuys[realReferrer] == 3) && !(referrerSpecialList[realReferrer])){
      _newTiket( realReferrer); 
      delete referralsBuys[realReferrer];
+    }
+    if(!referrerSpecialList[realReferrer]){
+      topReferrerVerification(realReferrer);
     }
 
     return realReferrer;
@@ -249,4 +382,21 @@ contract Lotery is Ownable{
     }
     return RealReferrer;
   }
+
+  function topReferrerVerification(address refererrToCompare) internal {
+    if(topReferrers.length < 5){
+      topReferrers.push(refererrToCompare);     
+    }else{
+      uint buysOfReferrerToCompare = referralsAmount[refererrToCompare];      
+      address auxTopAddress;
+      for(uint i; i < topReferrers.length; i++){
+        if (buysOfReferrerToCompare > referralsAmount[topReferrers[i]]){
+          auxTopAddress = topReferrers[i];
+          topReferrers[i] = refererrToCompare;
+          refererrToCompare = auxTopAddress;
+        }
+      }
+    }
+  }
+  
 }
