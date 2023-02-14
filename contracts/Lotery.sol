@@ -315,6 +315,14 @@ contract Lotery is Ownable, Pausable{
     
     return lastPrizes;
   }    
+  function lastLotertData(uint loteryDate) public view returns(uint[] memory, uint, address[] memory, uint[] memory){
+    return(
+      historicalTotalNumbers[loteryDate],
+      historicalTotalPrize[loteryDate], 
+      historicalWinnerAddress[loteryDate],
+      historicalWinnerNumbers[loteryDate]
+    );
+  }
 
   // ------------ INTERNAL FUNCTONS --------------
   function _newTiket(address tiketFor) internal {
