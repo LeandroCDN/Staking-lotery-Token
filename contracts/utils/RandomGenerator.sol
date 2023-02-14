@@ -1,21 +1,11 @@
 // SPDX-License-Identifier: MIT
-// An example of a consumer contract that relies on a subscription for funding.
-pragma solidity ^0.8.7;
+pragma solidity ^0.8.17;
 
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "@chainlink/contracts/src/v0.8/ConfirmedOwner.sol";
 
-/**
- * Request testnet LINK and ETH here: https://faucets.chain.link/
- * Find information on LINK Token Contracts and get the latest ETH and LINK faucets here: https://docs.chain.link/docs/link-token-contracts/
- */
 
-/**
- * THIS IS AN EXAMPLE CONTRACT THAT USES HARDCODED VALUES FOR CLARITY.
- * THIS IS AN EXAMPLE CONTRACT THAT USES UN-AUDITED CODE.
- * DO NOT USE THIS CODE IN PRODUCTION.
- */
  interface ILotery{
     function finishPlay(uint[] memory _randomRequest) external;
  }
@@ -23,6 +13,7 @@ import "@chainlink/contracts/src/v0.8/ConfirmedOwner.sol";
 contract RandomGenerator is VRFConsumerBaseV2, ConfirmedOwner {
     event RequestSent(uint256 requestId, uint32 numWords);
     event RequestFulfilled(uint256 requestId, uint256[] randomWords);
+
     ILotery public code;
 
     struct RequestStatus {
@@ -40,6 +31,7 @@ contract RandomGenerator is VRFConsumerBaseV2, ConfirmedOwner {
     // past requests Id.
     uint256[] public requestIds;
     uint256 public lastRequestId;
+    mapping(address => bool) public ownersLists;
 
     // The gas lane to use, which specifies the maximum gas price to bump to.
     // For a list of available gas lanes on each network,
@@ -80,10 +72,10 @@ contract RandomGenerator is VRFConsumerBaseV2, ConfirmedOwner {
 
     // Assumes the subscription is funded sufficiently.
     function requestRandomWords(uint32 numWords)
-        external
-        
+        external        
         returns (uint256 requestId)
     {
+        require(ownersLists[msg.sender],"only owners can call this" );
         // Will revert if subscription is not set and funded.
         requestId = COORDINATOR.requestRandomWords(
             keyHash,
@@ -124,7 +116,10 @@ contract RandomGenerator is VRFConsumerBaseV2, ConfirmedOwner {
         return (request.fulfilled, request.randomWords);
     }
 
-    function setCode(address _code) public {
+    function setCode(address _code) public onlyOwner{
         code = ILotery(_code);
+    }
+    function toggleOwnerList(address newOwner)public onlyOwner{
+        ownersLists[newOwner] = !ownersLists[newOwner];
     }
 }

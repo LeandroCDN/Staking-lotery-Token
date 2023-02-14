@@ -6,8 +6,6 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./utils/RandomGenerator.sol";
 
-// implement historicalAomountprize
-// ownerOfTijet -> rivate, and make a function with require i < actualnumber
 contract Lotery is Ownable, Pausable{
 
   uint public ticketCost;
@@ -89,7 +87,8 @@ contract Lotery is Ownable, Pausable{
     countAddress();
     emit BuyNumber(actualNumber-1, msg.sender, ref, loteryCounter);
   }
-
+  
+  //implemented 1day before launch, i dont have time to optimized this :C
   function buyNumberBath(address newReferrer, uint cant )public whenNotPaused{
     for(uint i; i < cant; i++){
       buyNumber(newReferrer);
@@ -117,7 +116,7 @@ contract Lotery is Ownable, Pausable{
     totalVolumeInPrize += totalPrize;
     historicalWinnerNumbers[loteryCounter] = winersNumbers;
     historicalWinnerAddress[loteryCounter] = LastAddressWiners;
-    historicalTotalNumbers[loteryCounter] = actualNumber;
+    historicalTotalNumbers[loteryCounter] = actualNumber-1;
     historicalTotalPrize[loteryCounter] = totalPrize;
     actualNumber = 1;
     loteryCounter++;
@@ -209,6 +208,7 @@ contract Lotery is Ownable, Pausable{
 
   function setSpecialReferrers(address addressOfReferrer, uint amount) public onlyOwner{
     require(amount <= stableFee, "Amount is to high");
+    require(amount > 0, "amount can not be zero");
     referrerSpecialList[addressOfReferrer] = true;
     referrerSpecialListAmount[addressOfReferrer] = amount;
   }
@@ -295,25 +295,26 @@ contract Lotery is Ownable, Pausable{
   
   function viewTopReferresAndAmount() public view returns(address[] memory ,uint[5] memory ){
     uint[5] memory topReferralsAmount;
-    for (uint i; i < 5; i++){
+    for (uint i; i < topReferrers.length; i++){
       topReferralsAmount[i] = referralsAmount[topReferrers[i]];
     }
     return (topReferrers, topReferralsAmount);
   }
 
-  function viewLastHistoricalTotalPrizes() public view returns(uint[30] memory){
-    uint[30] memory lastPrizes;
-    uint stop = 30;
+  function viewLastHistoricalTotalPrizes() public view returns(uint[31] memory){
+    uint[31] memory lastPrizes;
+    uint stop =30;
     if(loteryCounter < 30 ){      
        stop = loteryCounter; 
     }
-
-    for(uint i = 1 ; i <= stop; i++){
-      lastPrizes[i-1] = historicalTotalPrize[loteryCounter-i];
+    uint j;
+    for(uint i=stop ; i > 0; i--){
+      lastPrizes[j] = historicalTotalPrize[loteryCounter-i];
+      j++;
     }
     
     return lastPrizes;
-  }  
+  }    
 
   // ------------ INTERNAL FUNCTONS --------------
   function _newTiket(address tiketFor) internal {
@@ -383,20 +384,53 @@ contract Lotery is Ownable, Pausable{
     return RealReferrer;
   }
 
-  function topReferrerVerification(address refererrToCompare) internal {
-    if(topReferrers.length < 5){
-      topReferrers.push(refererrToCompare);     
+  function topReferrerVerification(address refererrToCompare) public {
+    if(topReferrers.length == 0){
+      topReferrers.push(refererrToCompare);
     }else{
-      uint buysOfReferrerToCompare = referralsAmount[refererrToCompare];      
-      address auxTopAddress;
-      for(uint i; i < topReferrers.length; i++){
-        if (buysOfReferrerToCompare > referralsAmount[topReferrers[i]]){
-          auxTopAddress = topReferrers[i];
-          topReferrers[i] = refererrToCompare;
-          refererrToCompare = auxTopAddress;
+      (bool isRepited, uint pos) = topRepitedAddress(refererrToCompare);
+      uint lenght = topReferrers.length;
+      if(!isRepited){
+        if(referralsAmount[refererrToCompare] < referralsAmount[topReferrers[lenght-1]] && lenght < 5){
+          topReferrers.push(refererrToCompare);  
+          lenght++; 
+        }else{
+          address aux;
+          for(uint i = 0; i < lenght ; i++){
+            if(referralsAmount[refererrToCompare] > referralsAmount[topReferrers[i]]){
+              aux = topReferrers[i];
+              topReferrers[i] = refererrToCompare;
+              refererrToCompare = aux;
+            }
+            if(i == lenght-1 && lenght < 5){
+              topReferrers.push(refererrToCompare);
+            }
+          }
         }
       }
+      if(isRepited){
+        address aux;          
+        for(uint i=pos; i > 0; i--){
+          if(referralsAmount[refererrToCompare] > referralsAmount[topReferrers[i-1]]){
+            aux =  topReferrers[i-1];
+            topReferrers[i-1] = refererrToCompare;
+            topReferrers[i] = aux;
+          }                     
+        }
+      }        
     }
+  }
+  
+
+  function topRepitedAddress(address refererrToCompare) internal view returns(bool verification, uint index){
+    
+    for(uint i; i < topReferrers.length; i++){
+     if(topReferrers[i] == refererrToCompare) {
+      verification = true;
+      index = i;
+     }
+    }
+
   }
   
 }
