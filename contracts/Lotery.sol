@@ -265,7 +265,7 @@ contract Lotery is Ownable, Pausable{
           ]
           );
   }
-  function viewLoteryData() public view returns(uint[10] memory, uint[30] memory ){
+  function viewLoteryData() public view returns(uint[10] memory, uint[31] memory ){
     return([  
             cantOfNumbers,
             loteryCounter,
