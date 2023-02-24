@@ -6,6 +6,8 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./utils/RandomGenerator.sol";
 
+
+
 contract Lotery is Ownable, Pausable{
 
   uint public ticketCost;
@@ -176,6 +178,10 @@ contract Lotery is Ownable, Pausable{
     ticketCoin = _ticketCoin;
   }
 
+  function setTicketCost(uint _ticketCost) public onlyOwner{
+    ticketCost = _ticketCost;
+  }
+
   function setVRF(RandomGenerator _vrf) public onlyOwner{
     vrf = _vrf;
   }
@@ -314,13 +320,14 @@ contract Lotery is Ownable, Pausable{
     }
     
     return lastPrizes;
-  }    
-  function lastLotertData(uint loteryDate) public view returns(uint[] memory, uint, address[] memory, uint[] memory){
-    return(
-      historicalTotalNumbers[loteryDate],
-      historicalTotalPrize[loteryDate], 
-      historicalWinnerAddress[loteryDate],
-      historicalWinnerNumbers[loteryDate]
+  }   
+
+  function lastLoteryData(uint i) public view returns(uint, uint, address[] memory, uint[] memory) {
+    return (
+      historicalTotalNumbers[i],
+      historicalTotalPrize[i],
+      historicalWinnerAddress[i],
+      historicalWinnerNumbers[i]
     );
   }
 
@@ -428,7 +435,6 @@ contract Lotery is Ownable, Pausable{
       }        
     }
   }
-  
 
   function topRepitedAddress(address refererrToCompare) internal view returns(bool verification, uint index){
     
