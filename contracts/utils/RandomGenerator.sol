@@ -37,7 +37,7 @@ contract RandomGenerator is VRFConsumerBaseV2, ConfirmedOwner {
     // For a list of available gas lanes on each network,
     // see https://docs.chain.link/docs/vrf/v2/subscription/supported-networks/#configurations
     bytes32 keyHash =
-        0x4b09e658ed251bcafeebbc69400383d49f344ace09b9576fe248bb02c003fe9f;
+        0xd729dc84e21ae57ffb6be0053bf2b0668aa2aaf300a2a7b2ddf7dc0bb6e875a8;
 
     // Depends on the number of requested values that you want sent to the
     // fulfillRandomWords() function. Storing each word costs about 20,000 gas,
@@ -55,8 +55,8 @@ contract RandomGenerator is VRFConsumerBaseV2, ConfirmedOwner {
     // uint32 numWords = 2;
 
     /**
-     * HARDCODED FOR GOERLI
-     * COORDINATOR: 0x2Ca8E0C643bDe4C2E08ab1fA0da3401AdAD7734D
+     * HARDCODED FOR Poligon Mainet
+     * COORDINATOR: 0xAE975071Be8F8eE67addBC1A82488F1C24858067
      */
     constructor(
         uint64 subscriptionId
@@ -65,7 +65,7 @@ contract RandomGenerator is VRFConsumerBaseV2, ConfirmedOwner {
         ConfirmedOwner(msg.sender)
     {
         COORDINATOR = VRFCoordinatorV2Interface(
-            	0x7a1BaC17Ccc5b313516C5E16fb24f7659aA5ebed
+            	0xAE975071Be8F8eE67addBC1A82488F1C24858067
         );
         s_subscriptionId = subscriptionId;
     }
