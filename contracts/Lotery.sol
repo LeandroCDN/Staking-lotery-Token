@@ -21,6 +21,8 @@ contract Lotery is Ownable, Pausable{
   uint public totalVolumeInPrize;
   uint public totalTiketSell;
   uint public totalFee;
+  uint public time;
+  uint public timePlus;
 
   uint[] public winersNumbers; 
   uint[] public percentForWiners;
@@ -106,7 +108,8 @@ contract Lotery is Ownable, Pausable{
     require(msg.sender == address(vrf), "You dont are de caller");
     require(actualNumber >= minNumber, "actual number is down");
     require(cantOfAddress > minNumberOfAddress, "need more diferents buyers");
-     
+    require(time < block.timestamp, "need more time");
+    time =  block.timestamp + timePlus;
     winersNumbers = winersVerifications(randomNumber);
    
     for(uint i; i < LastAddressWiners.length; i++){       
@@ -379,6 +382,11 @@ contract Lotery is Ownable, Pausable{
       listOfBuyers[loteryCounter][msg.sender] = true;
     }
   }
+  
+  //In seconds
+  function setTimePlus(uint newTimePlusSeconds) public {
+    timePlus = newTimePlusSeconds;
+  }
 
   function setReferrer(address newReferrer) internal returns(address){
     address RealReferrer = referrer[msg.sender];
@@ -433,7 +441,6 @@ contract Lotery is Ownable, Pausable{
       }        
     }
   }
-  
 
   function topRepitedAddress(address refererrToCompare) internal view returns(bool verification, uint index){
     
