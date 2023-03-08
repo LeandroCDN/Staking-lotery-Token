@@ -36,7 +36,7 @@ contract Lotery is Ownable, Pausable{
   address[] public list;
   address[] public topReferrers;
   IERC20 public ticketCoin;
-  RandomGenerator public vrf;
+  RandomGeneratorUno public vrf;
   mapping(uint => address) public ownerOfTiket;
   mapping(address=>uint) public referralsBuys;
   mapping(address=>uint) public referralsAmount;
@@ -58,7 +58,7 @@ contract Lotery is Ownable, Pausable{
     uint _stableFee,
     address _house,
     uint[] memory _percentForWiners,
-    RandomGenerator _RandomGenerator,
+    RandomGeneratorUno _RandomGenerator,
     IERC20 _ticketCoin
     ){     
     ticketCost = _ticketCost;
@@ -76,7 +76,7 @@ contract Lotery is Ownable, Pausable{
     address ref =  referrer[msg.sender];
 
     if(!(ref == address(0) && newReferrer == msg.sender)){
-      ref = referralSystem(newReferrer);
+      ref =   (newReferrer);
     }else{
       totalFee = totalFee + (ticketCost * (stableFee) ) / 100;
     }
@@ -136,24 +136,28 @@ contract Lotery is Ownable, Pausable{
     delete winersNumbers;
     uint[]  memory subWinersNumbers = randomNumber;
     for(uint i; i < randomNumber.length; i++){
-      uint subWinerNumber = (randomNumber[i] % actualNumber) + 1 ;
+      uint subWinerNumber = (randomNumber[i] % actualNumber);
+
+      if (subWinerNumber == 0) {
+        subWinerNumber++;
+      }
       
       if(i == 0){ 
         subWinersNumbers[i] = subWinerNumber ; 
         LastAddressWiners.push(ownerOfTiket[subWinersNumbers[i]]);
       }
+
       else{
         for(uint j; j < i; j++){                 
-          if( LastAddressWiners[j] == ownerOfTiket[subWinerNumber]){
+          while( LastAddressWiners[j] == ownerOfTiket[subWinerNumber]){
             if (subWinerNumber == actualNumber){ subWinerNumber == 0; }
             subWinerNumber++;
-            j = 0;
           }          
 
-          if(LastAddressWiners[0] == ownerOfTiket[subWinerNumber]){
+          while(LastAddressWiners[0] == ownerOfTiket[subWinerNumber]){
+            if (subWinerNumber == actualNumber){ subWinerNumber == 0; }
             subWinerNumber++;
           }
-          
         }
         subWinersNumbers[i]=subWinerNumber;
         LastAddressWiners.push(ownerOfTiket[subWinersNumbers[i]]);
@@ -183,7 +187,7 @@ contract Lotery is Ownable, Pausable{
     ticketCost = _ticketCost;
   }
 
-  function setVRF(RandomGenerator _vrf) public onlyOwner{
+  function setVRF(RandomGeneratorUno _vrf) public onlyOwner{
     vrf = _vrf;
   }
 
