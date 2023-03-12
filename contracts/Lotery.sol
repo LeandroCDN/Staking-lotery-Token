@@ -36,7 +36,7 @@ contract Lotery is Ownable, Pausable{
   address[] public list;
   address[] public topReferrers;
   IERC20 public ticketCoin;
-  RandomGeneratorUno public vrf;
+  RandomGenerator public vrf;
   mapping(uint => address) public ownerOfTiket;
   mapping(address=>uint) public referralsBuys;
   mapping(address=>uint) public referralsAmount;
@@ -58,7 +58,7 @@ contract Lotery is Ownable, Pausable{
     uint _stableFee,
     address _house,
     uint[] memory _percentForWiners,
-    RandomGeneratorUno _RandomGenerator,
+    RandomGenerator _RandomGenerator,
     IERC20 _ticketCoin
     ){     
     ticketCost = _ticketCost;
@@ -70,32 +70,31 @@ contract Lotery is Ownable, Pausable{
     setPercentForWiners(_percentForWiners);
   }  
 
-  function buyNumber(address newReferrer) public whenNotPaused {
-    ticketCoin.transferFrom(msg.sender, address(this), ticketCost);
-    _newTiket( msg.sender);
-    address ref =  referrer[msg.sender];
+  function buyNumber(address newReferrer, uint cant) public whenNotPaused {
+    uint amount = ticketCost * cant;
+    ticketCoin.transferFrom(msg.sender, address(this), amount);
+    _newTiket(msg.sender, cant);
+    address ref = referrer[msg.sender];
 
     if(!(ref == address(0) && newReferrer == msg.sender)){
-      ref =   (newReferrer);
+      ref = referralSystem(newReferrer, cant);
     }else{
-      totalFee = totalFee + (ticketCost * (stableFee) ) / 100;
-    }
-
+      totalFee = totalFee + (amount * stableFee ) / 100;
+    }    
+    totalPrize = totalPrize + (amount * stablePrize) / 100;
     
-    totalPrize = totalPrize + (ticketCost * stablePrize) / 100;
-    
-    historicalTiketsOwner[loteryCounter][msg.sender].push(actualNumber-1);
-    whiteLister();
+    //historicalTiketsOwner[loteryCounter][msg.sender].push(actualNumber-1);
+    //whiteLister(); // se puede guardar en base de datos
     countAddress();
     emit BuyNumber(actualNumber-1, msg.sender, ref, loteryCounter);
   }
   
   //implemented 1day before launch, i dont have time to optimized this :C
-  function buyNumberBath(address newReferrer, uint cant )public whenNotPaused{
-    for(uint i; i < cant; i++){
-      buyNumber(newReferrer);
-    }
-  }
+  // function buyNumberBath(address newReferrer, uint cant )public whenNotPaused{
+  //   for(uint i; i < cant; i++){
+  //     buyNumber(newReferrer);
+  //   }
+  // }
 
   function selectNumbers() public {
     require(msg.sender == caller, "You dont are de caller");    
@@ -187,7 +186,7 @@ contract Lotery is Ownable, Pausable{
     ticketCost = _ticketCost;
   }
 
-  function setVRF(RandomGeneratorUno _vrf) public onlyOwner{
+  function setVRF(RandomGenerator _vrf) public onlyOwner{
     vrf = _vrf;
   }
 
@@ -337,31 +336,34 @@ contract Lotery is Ownable, Pausable{
   }
 
   // ------------ INTERNAL FUNCTONS --------------
-  function _newTiket(address tiketFor) internal {
-    ownerOfTiket[actualNumber] = tiketFor;    
-    actualNumber++;
-    totalTiketSell++;
+  function _newTiket(address tiketFor, uint cant) internal {
+    for(uint i; i < cant; i++){
+      ownerOfTiket[actualNumber] = tiketFor;    
+      actualNumber++;
+      totalTiketSell++;
+    }
   }  
 
   //function de comprar voleto automatico para referentes
-  function referralSystem(address newReferrer) internal returns(address){
+  function referralSystem(address newReferrer, uint cant) internal returns(address){
+    uint amount = ticketCost * cant;
     address realReferrer = setReferrer(newReferrer);
     uint fee = 5;
     if(referrerSpecialList[realReferrer]){
       fee = referrerSpecialListAmount[realReferrer];
     }
 
-    totalFee = totalFee + (ticketCost * (stableFee-fee) ) / 100; 
-    ticketCoin.transfer(realReferrer, ((ticketCost*fee)/100));
+    totalFee = totalFee + (amount * (stableFee-fee) ) / 100; 
+    ticketCoin.transfer(realReferrer, ((amount*fee)/100));
 
     //special list cant recive free tikets
     if((referralsBuys[realReferrer] == 3) && !(referrerSpecialList[realReferrer])){
-     _newTiket( realReferrer); 
+     _newTiket( realReferrer, 1); 
      delete referralsBuys[realReferrer];
     }
-    if(!referrerSpecialList[realReferrer]){
-      topReferrerVerification(realReferrer);
-    }
+    // if(!referrerSpecialList[realReferrer]){
+    //   topReferrerVerification(realReferrer);
+    // }
 
     return realReferrer;
   }
@@ -373,7 +375,7 @@ contract Lotery is Ownable, Pausable{
         if(list[i]==msg.sender){
           inList = true;
         }
-      }
+      }      
       if(!inList){
         list.push(msg.sender);
       }
