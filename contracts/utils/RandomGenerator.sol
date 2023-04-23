@@ -61,7 +61,7 @@ contract RandomGenerator is VRFConsumerBaseV2, ConfirmedOwner {
     constructor(
         uint64 subscriptionId
     )
-        VRFConsumerBaseV2(0x7a1BaC17Ccc5b313516C5E16fb24f7659aA5ebed)
+        VRFConsumerBaseV2(0xAE975071Be8F8eE67addBC1A82488F1C24858067)
         ConfirmedOwner(msg.sender)
     {
         COORDINATOR = VRFCoordinatorV2Interface(

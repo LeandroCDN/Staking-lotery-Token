@@ -5,9 +5,10 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./utils/RandomGenerator.sol";
+//todo dele list & referer tops vars
+//todo totalTiketSell
 
 contract Lotery is Ownable, Pausable{
-
   uint public ticketCost;
   uint public actualNumber = 1; 
   uint public minNumber = 5;
@@ -27,14 +28,13 @@ contract Lotery is Ownable, Pausable{
   uint[] public winersNumbers; 
   uint[] public percentForWiners;
   uint32 public cantOfNumbers = 5; //cant of winers per gift
-  bool public whiteList = true;
 
   address public caller;
   address public manager = msg.sender;
   address public house;
   address[] public LastAddressWiners; 
-  address[] public list;
-  address[] public topReferrers;
+  // address[] public topReferrers;
+  address[] public referralList;
   IERC20 public ticketCoin;
   RandomGenerator public vrf;
   mapping(uint => address) public ownerOfTiket;
@@ -48,7 +48,6 @@ contract Lotery is Ownable, Pausable{
   mapping(uint=>uint[]) public historicalWinnerNumbers;
   mapping(uint=>address[]) public historicalWinnerAddress;
   mapping(uint=>mapping(address=>uint[])) public historicalTiketsOwner;
-  mapping(uint=>mapping(address=>bool)) public listOfBuyers;
 
   event BuyNumber(uint number, address buyer, address ref, uint _loteryCounter);
   event Winners(uint loteryNumber, address[] winersNumbers, uint[] winners);
@@ -80,26 +79,18 @@ contract Lotery is Ownable, Pausable{
       ref = referralSystem(newReferrer, cant);
     }else{
       totalFee = totalFee + (amount * stableFee ) / 100;
-    }    
+    }        
     totalPrize = totalPrize + (amount * stablePrize) / 100;
     
-    //historicalTiketsOwner[loteryCounter][msg.sender].push(actualNumber-1);
-    //whiteLister(); // se puede guardar en base de datos
     countAddress();
-    emit BuyNumber(actualNumber-1, msg.sender, ref, loteryCounter);
+    emit BuyNumber(actualNumber-1, msg.sender, ref, loteryCounter);    
   }
   
-  //implemented 1day before launch, i dont have time to optimized this :C
-  // function buyNumberBath(address newReferrer, uint cant )public whenNotPaused{
-  //   for(uint i; i < cant; i++){
-  //     buyNumber(newReferrer);
-  //   }
-  // }
-
   function selectNumbers() public {
     require(msg.sender == caller, "You dont are de caller");    
     require(actualNumber >= minNumber, "actual number is down");
     require(cantOfAddress > minNumberOfAddress, "need more diferents buyers");
+    
     vrf.requestRandomWords(cantOfNumbers);
   }
 
@@ -165,18 +156,19 @@ contract Lotery is Ownable, Pausable{
     return subWinersNumbers;
   }  
 
-  function withDrawhticketCoins() public  onlyOwner{
+  function withDrawhticketCoins() public onlyOwner{
     ticketCoin.transfer(house, totalFee);
     delete totalFee;
   }
+
   // ------------ Set FUNCTONS --------------
   function pause() public onlyOwner {
         _pause();
     }
 
-    function unpause() public onlyOwner {
-        _unpause();
-    }
+  function unpause() public onlyOwner {
+      _unpause();
+  }
 
   function setticketCoin(IERC20 _ticketCoin) public onlyOwner{
     ticketCoin = _ticketCoin;
@@ -223,14 +215,11 @@ contract Lotery is Ownable, Pausable{
     referrerSpecialListAmount[addressOfReferrer] = amount;
   }
 
-  function toggleWhiteList() public onlyOwner{
-    whiteList = !whiteList;
-  }
-
   function deleteSpecialReferrers(address addressOfReferrer)public onlyOwner{
     delete referrerSpecialList[addressOfReferrer];
     delete referrerSpecialListAmount[addressOfReferrer];
   }
+
   function setMinNumberOfAddress(uint _minNumberOfAddress) public {
     minNumberOfAddress = _minNumberOfAddress;
   }
@@ -238,10 +227,6 @@ contract Lotery is Ownable, Pausable{
 
   function winAmount(uint i) public view returns(uint){   
     return (totalPrize * percentForWiners[i]) / 100;  
-  }
-
-  function viewWhiteListLength() public view returns(uint){
-    return list.length;
   }
 
   function viewLastAddressWiners() public view returns(address[] memory){
@@ -275,6 +260,7 @@ contract Lotery is Ownable, Pausable{
           ]
           );
   }
+  
   function viewLoteryData() public view returns(uint[10] memory, uint[31] memory ){
     return([  
             cantOfNumbers,
@@ -292,10 +278,10 @@ contract Lotery is Ownable, Pausable{
           );
   }
 
-  function viewReferralsData(address user) public view returns(bool,uint, uint, address, uint[] memory, uint[] memory  ){
+  function viewUserData(address user) public view returns(bool,uint, uint, address, uint[] memory, uint[] memory  ){
     return (
-      referrerSpecialList[user],
-      referrerSpecialListAmount[user],
+      referrerSpecialList[user], 
+      referrerSpecialListAmount[user], 
       referralsAmount[user],
       referrer[user],
       historicalTiketsOwner[loteryCounter][user],
@@ -303,14 +289,6 @@ contract Lotery is Ownable, Pausable{
     );
   }
   
-  function viewTopReferresAndAmount() public view returns(address[] memory ,uint[5] memory ){
-    uint[5] memory topReferralsAmount;
-    for (uint i; i < topReferrers.length; i++){
-      topReferralsAmount[i] = referralsAmount[topReferrers[i]];
-    }
-    return (topReferrers, topReferralsAmount);
-  }
-
   function viewLastHistoricalTotalPrizes() public view returns(uint[31] memory){
     uint[31] memory lastPrizes;
     uint stop =30;
@@ -324,7 +302,21 @@ contract Lotery is Ownable, Pausable{
     }
     
     return lastPrizes;
-  }   
+  }
+
+  function getAmountOfList() public view returns (uint[] memory) {
+    address[] memory referralListMemory= referralList;
+    uint length = referralList.length;
+    uint[] memory amounts = new uint[](length);
+    for(uint i; i < referralListMemory.length; i++){
+      amounts[i] = referralsAmount[referralListMemory[i]];
+    }
+    return amounts;
+  }
+
+  function getRefferalList() public view returns(address[] memory){
+    return referralList;
+  }
 
   function lastLoteryData(uint i) public view returns(uint, uint, address[] memory, uint[] memory) {
     return (
@@ -339,6 +331,7 @@ contract Lotery is Ownable, Pausable{
   function _newTiket(address tiketFor, uint cant) internal {
     for(uint i; i < cant; i++){
       ownerOfTiket[actualNumber] = tiketFor;    
+      historicalTiketsOwner[loteryCounter][msg.sender].push(actualNumber);
       actualNumber++;
       totalTiketSell++;
     }
@@ -347,7 +340,7 @@ contract Lotery is Ownable, Pausable{
   //function de comprar voleto automatico para referentes
   function referralSystem(address newReferrer, uint cant) internal returns(address){
     uint amount = ticketCost * cant;
-    address realReferrer = setReferrer(newReferrer);
+    address realReferrer = setReferrer(newReferrer, cant);
     uint fee = 5;
     if(referrerSpecialList[realReferrer]){
       fee = referrerSpecialListAmount[realReferrer];
@@ -361,31 +354,13 @@ contract Lotery is Ownable, Pausable{
      _newTiket( realReferrer, 1); 
      delete referralsBuys[realReferrer];
     }
-    // if(!referrerSpecialList[realReferrer]){
-    //   topReferrerVerification(realReferrer);
-    // }
 
     return realReferrer;
   }
 
-  function whiteLister() internal {
-    if(whiteList){
-      bool inList;
-      for(uint i; i < list.length; i++){
-        if(list[i]==msg.sender){
-          inList = true;
-        }
-      }      
-      if(!inList){
-        list.push(msg.sender);
-      }
-    }
-  }
-
   function countAddress() internal {
-    if(!listOfBuyers[loteryCounter][msg.sender]){
+    if(historicalTiketsOwner[loteryCounter][msg.sender].length > 0 ){
       cantOfAddress++;
-      listOfBuyers[loteryCounter][msg.sender] = true;
     }
   }
   
@@ -394,69 +369,24 @@ contract Lotery is Ownable, Pausable{
     timePlus = newTimePlusSeconds;
   }
 
-  function setReferrer(address newReferrer) internal returns(address){
+  function setReferrer(address newReferrer, uint cant) internal returns(address){
     address RealReferrer = referrer[msg.sender];
 
     if(RealReferrer == address(0)){
       if(newReferrer != address(0) ){
         referrer[msg.sender] = newReferrer;
+        if(referralsAmount[newReferrer] == 0 && !(referrerSpecialList[newReferrer])){
+          referralList.push(newReferrer);
+        }
         referralsBuys[newReferrer]++;
-        referralsAmount[newReferrer]++;
+        referralsAmount[newReferrer]+=cant;
         RealReferrer = newReferrer;
       }
     }else{
       referralsBuys[RealReferrer]++;
-      referralsAmount[RealReferrer]++;
+      referralsAmount[RealReferrer]+=cant;
     }
     return RealReferrer;
-  }
-
-  function topReferrerVerification(address refererrToCompare) public {
-    if(topReferrers.length == 0){
-      topReferrers.push(refererrToCompare);
-    }else{
-      (bool isRepited, uint pos) = topRepitedAddress(refererrToCompare);
-      uint lenght = topReferrers.length;
-      if(!isRepited){
-        if(referralsAmount[refererrToCompare] < referralsAmount[topReferrers[lenght-1]] && lenght < 5){
-          topReferrers.push(refererrToCompare);  
-          lenght++; 
-        }else{
-          address aux;
-          for(uint i = 0; i < lenght ; i++){
-            if(referralsAmount[refererrToCompare] > referralsAmount[topReferrers[i]]){
-              aux = topReferrers[i];
-              topReferrers[i] = refererrToCompare;
-              refererrToCompare = aux;
-            }
-            if(i == lenght-1 && lenght < 5){
-              topReferrers.push(refererrToCompare);
-            }
-          }
-        }
-      }
-      if(isRepited){
-        address aux;          
-        for(uint i=pos; i > 0; i--){
-          if(referralsAmount[refererrToCompare] > referralsAmount[topReferrers[i-1]]){
-            aux =  topReferrers[i-1];
-            topReferrers[i-1] = refererrToCompare;
-            topReferrers[i] = aux;
-          }                     
-        }
-      }        
-    }
-  }
-
-  function topRepitedAddress(address refererrToCompare) internal view returns(bool verification, uint index){
-    
-    for(uint i; i < topReferrers.length; i++){
-     if(topReferrers[i] == refererrToCompare) {
-      verification = true;
-      index = i;
-     }
-    }
-
   }
   
 }

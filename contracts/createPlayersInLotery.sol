@@ -31,7 +31,6 @@ contract Player{
   }
 }
 
-
 contract CreatePlayersInLotery{
   
   Player[] public players;

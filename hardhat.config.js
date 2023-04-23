@@ -2,13 +2,22 @@ require("@nomicfoundation/hardhat-toolbox");
 require('dotenv').config();
 
 const ALCHEMY_API_KEY_MUMBAI = process.env.ALCHEMY_API_KEY_MUMBAI;
+const ALCHEMY_API_KEY_POLYGON = process.env.ALCHEMY_API_KEY_MUMBAI;
 const MUMBAI_PRIVATE_KEY = process.env.MUMBAI_PRIVATE_KEY;
 const MUMBAI_SCAN_KEY = process.env.MUMBAI_SCAN_KEY;
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
 
-  solidity: "0.8.17",
+  solidity: {
+    version: "0.8.19",
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 1000,
+      },
+    },
+  },
   networks: {
     hardhat: {},
     // goerli: {
@@ -19,7 +28,14 @@ module.exports = {
     mumbai: {
       url: `https://polygon-mumbai.g.alchemy.com/v2/${ALCHEMY_API_KEY_MUMBAI}`,
       accounts: [MUMBAI_PRIVATE_KEY],
-      gas:300000,
+      gasPrice: 15000000000,
+      gas:600000,
+    },
+    polygon: {
+      url: `https://polygon-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY_POLYGON}`,
+      accounts: [MUMBAI_PRIVATE_KEY],
+      gasPrice: 155000000000,
+      gas:600000,
     },
   },
   etherscan: {
