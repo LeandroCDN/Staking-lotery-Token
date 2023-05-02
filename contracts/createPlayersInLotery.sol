@@ -3,21 +3,21 @@ pragma solidity >=0.8.12 <0.9.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 interface ILotery{
-  function buyNumberBath(address newReferrer, uint cant)external;
+  function buyNumber(address newReferrer, uint cant)external;
 }
 
 contract Player{
   IERC20 coin = IERC20(0xD6920eeAF9b9bc7288765F72B4d6Da3e47308464);
   
   constructor(address lotery ){
-    coin.approve(lotery, 500000 * 1 ether);
+    coin.approve(lotery, 500000000 * 1 ether);
   }
 
-  function playLotery(address _lotery) public{
-    ILotery(_lotery).buyNumberBath(address(this),fakeRandom());
+  function playLotery(address _lotery, uint cant) public{
+    ILotery(_lotery).buyNumber(address(this),cant);
   }
   function playLoterySelecRefer(address refer, address _lotery) public{
-    ILotery(_lotery).buyNumberBath(refer,fakeRandom());
+    ILotery(_lotery).buyNumber(refer,1);
   }
 
   function fakeRandom()public view returns(uint){
@@ -27,7 +27,7 @@ contract Player{
     return (answer == 0 ? 1:  answer);
   }
   function aprovess(address lotery) public {
-    coin.approve(lotery, 500000 * 1 ether);
+    coin.approve(lotery, 500000000 * 1 ether);
   }
 }
 
@@ -53,38 +53,15 @@ contract CreatePlayersInLotery{
    }
   }
 
-  function play(uint cant) public {
-    uint stop = counter + cant;
-    if(stop >= players.length){
-      stop = players.length;
-    }
-    uint aux = counter;
-    for(uint i=aux; i < stop; i++){
-      if(currenci.balanceOf(address(players[i]))>7){
-        players[i].playLotery(loteryAdrress);
-      }
-
-      if(i == players.length-1 ){
-        delete counter;
-      }else{
-        counter++;
-      }
-    }
-  }
-
-  function playAux(uint start, uint finish)public {   
+  function playAux(uint start, uint finish, uint cant)public {   
     for(uint i=start; i < finish; i++){   
-      if(currenci.balanceOf(address(players[i]))>7){
-        players[i].playLotery(loteryAdrress);
-      }   
+      players[i].playLotery(loteryAdrress, cant);
     }
   }
 
   function playRefers(address refer, uint start, uint finish)public {   
     for(uint i=start; i < finish; i++){   
-      if(currenci.balanceOf(address(players[i]))>1){
-        players[i].playLoterySelecRefer(refer,loteryAdrress);
-      }   
+      players[i].playLoterySelecRefer(refer,loteryAdrress);
     }
   }
   

@@ -5,8 +5,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./utils/RandomGenerator.sol";
-//todo dele list & referer tops vars
-//todo totalTiketSell
 
 contract Lotery is Ownable, Pausable{
   uint public ticketCost;
@@ -70,8 +68,9 @@ contract Lotery is Ownable, Pausable{
   }  
 
   function buyNumber(address newReferrer, uint cant) public whenNotPaused {
-    uint amount = ticketCost * cant;
+    uint amount = ticketCost *   cant;
     ticketCoin.transferFrom(msg.sender, address(this), amount);
+    countAddress();
     _newTiket(msg.sender, cant);
     address ref = referrer[msg.sender];
 
@@ -82,7 +81,7 @@ contract Lotery is Ownable, Pausable{
     }        
     totalPrize = totalPrize + (amount * stablePrize) / 100;
     
-    countAddress();
+    
     emit BuyNumber(actualNumber-1, msg.sender, ref, loteryCounter);    
   }
   
@@ -359,7 +358,7 @@ contract Lotery is Ownable, Pausable{
   }
 
   function countAddress() internal {
-    if(historicalTiketsOwner[loteryCounter][msg.sender].length > 0 ){
+    if(historicalTiketsOwner[loteryCounter][msg.sender].length == 0 ){
       cantOfAddress++;
     }
   }
