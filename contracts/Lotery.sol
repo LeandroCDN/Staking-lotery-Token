@@ -10,7 +10,7 @@ contract Lotery is Ownable, Pausable{
   uint public ticketCost;
   uint public actualNumber = 1; 
   uint public minNumber = 5;
-  uint public minNumberOfAddress = 3;
+  uint public minNumberOfAddress = 5;
   uint public loteryCounter; 
   uint public cantOfAddress;
 
@@ -19,19 +19,19 @@ contract Lotery is Ownable, Pausable{
   uint public totalPrize;
   uint public totalVolumeInPrize;
   uint public totalTiketSell;
+  uint public totalTiketFree;
   uint public totalFee;
   uint public time;
   uint public timePlus;
 
   uint[] public winersNumbers; 
   uint[] public percentForWiners;
-  uint32 public cantOfNumbers = 5; //cant of winers per gift
+  uint32 public cantOfNumbers = 5; //number of winers per gift
 
   address public caller;
   address public manager = msg.sender;
   address public house;
   address[] public LastAddressWiners; 
-  // address[] public topReferrers;
   address[] public referralList;
   IERC20 public ticketCoin;
   RandomGenerator public vrf;
@@ -46,6 +46,7 @@ contract Lotery is Ownable, Pausable{
   mapping(uint=>uint[]) public historicalWinnerNumbers;
   mapping(uint=>address[]) public historicalWinnerAddress;
   mapping(uint=>mapping(address=>uint[])) public historicalTiketsOwner;
+  mapping(uint=>mapping(address=>uint[])) public historicalTiketsFree;
 
   event BuyNumber(uint number, address buyer, address ref, uint _loteryCounter);
   event Winners(uint loteryNumber, address[] winersNumbers, uint[] winners);
@@ -67,15 +68,15 @@ contract Lotery is Ownable, Pausable{
     setPercentForWiners(_percentForWiners);
   }  
 
-  function buyNumber(address newReferrer, uint cant) public whenNotPaused {
-    uint amount = ticketCost *   cant;
+  function buyNumber(address newReferrer, uint _amount) public whenNotPaused {
+    uint amount = ticketCost *   _amount;
     ticketCoin.transferFrom(msg.sender, address(this), amount);
     countAddress();
-    _newTiket(msg.sender, cant);
+    _newTiket(msg.sender, _amount, false);
     address ref = referrer[msg.sender];
 
     if(!(ref == address(0) && newReferrer == msg.sender)){
-      ref = referralSystem(newReferrer, cant);
+      ref = referralSystem(newReferrer, _amount);
     }else{
       totalFee = totalFee + (amount * stableFee ) / 100;
     }        
@@ -181,8 +182,8 @@ contract Lotery is Ownable, Pausable{
     vrf = _vrf;
   }
 
-  function setCantOfNumbers(uint32 _cantOfNumbers) public onlyOwner{
-    cantOfNumbers = _cantOfNumbers;
+  function setCantOfNumbers(uint32 _amountOfNumbers) public onlyOwner{
+    cantOfNumbers = _amountOfNumbers;
   }
 
   function setPercentForWiners(uint[] memory _percentForWiners) public onlyOwner{
@@ -244,47 +245,40 @@ contract Lotery is Ownable, Pausable{
     return (viewWinerNumbers(),winAmountValue, viewLastAddressWiners());
   }
 
-  function viewLotery() public view returns(uint[10] memory){
-    return([  
-            cantOfNumbers,
-            loteryCounter,
-            ticketCost,
-            cantOfAddress,
-            actualNumber,
-            totalPrize,
-            historicalTotalPrize[loteryCounter-1],
-            historicalTotalNumbers[loteryCounter-1],
-            totalVolumeInPrize,
-            totalTiketSell
-          ]
-          );
+  function viewLotery() internal view returns(uint[11] memory){
+    return(
+      [  
+        cantOfNumbers,
+        loteryCounter,
+        ticketCost,
+        cantOfAddress,
+        actualNumber,
+        totalPrize,
+        historicalTotalPrize[loteryCounter-1],
+        historicalTotalNumbers[loteryCounter-1],
+        totalVolumeInPrize,
+        totalTiketSell,
+        totalTiketFree
+      ]
+    );
   }
   
-  function viewLoteryData() public view returns(uint[10] memory, uint[31] memory ){
-    return([  
-            cantOfNumbers,
-            loteryCounter,
-            ticketCost,
-            cantOfAddress,
-            actualNumber,
-            totalPrize,
-            historicalTotalPrize[loteryCounter-1],
-            historicalTotalNumbers[loteryCounter-1],
-            totalVolumeInPrize,
-            totalTiketSell
-          ],
-          viewLastHistoricalTotalPrizes()
-          );
+  function viewLoteryData() public view returns(uint[11] memory, uint[31] memory ){
+    return(viewLotery(),viewLastHistoricalTotalPrizes());
   }
 
-  function viewUserData(address user) public view returns(bool,uint, uint, address, uint[] memory, uint[] memory  ){
+  function viewUserData(address user) public view returns(
+    bool,uint, uint, address, uint[] memory, uint[] memory, uint[] memory, uint[] memory 
+  ){
     return (
       referrerSpecialList[user], 
       referrerSpecialListAmount[user], 
       referralsAmount[user],
       referrer[user],
       historicalTiketsOwner[loteryCounter][user],
-      historicalTiketsOwner[loteryCounter-1][user]    
+      historicalTiketsOwner[loteryCounter-1][user],
+      historicalTiketsFree[loteryCounter][user],
+      historicalTiketsFree[loteryCounter-1][user]
     );
   }
   
@@ -327,19 +321,24 @@ contract Lotery is Ownable, Pausable{
   }
 
   // ------------ INTERNAL FUNCTONS --------------
-  function _newTiket(address tiketFor, uint cant) internal {
-    for(uint i; i < cant; i++){
-      ownerOfTiket[actualNumber] = tiketFor;    
-      historicalTiketsOwner[loteryCounter][msg.sender].push(actualNumber);
+  function _newTiket(address ticketFor, uint amount, bool freeTicket) internal {
+    for(uint i; i < amount; i++){
+      if(freeTicket){
+        historicalTiketsFree[loteryCounter][ticketFor].push(actualNumber);
+        totalTiketFree++;
+      }else{
+        totalTiketSell++;
+      }
+      ownerOfTiket[actualNumber] = ticketFor;    
+      historicalTiketsOwner[loteryCounter][ticketFor].push(actualNumber);
       actualNumber++;
-      totalTiketSell++;
     }
   }  
 
   //function de comprar voleto automatico para referentes
-  function referralSystem(address newReferrer, uint cant) internal returns(address){
-    uint amount = ticketCost * cant;
-    address realReferrer = setReferrer(newReferrer, cant);
+  function referralSystem(address newReferrer, uint _amount) internal returns(address){
+    uint amount = ticketCost * _amount;
+    address realReferrer = setReferrer(newReferrer, _amount);
     uint fee = 5;
     if(referrerSpecialList[realReferrer]){
       fee = referrerSpecialListAmount[realReferrer];
@@ -350,10 +349,9 @@ contract Lotery is Ownable, Pausable{
 
     //special list cant recive free tikets
     if((referralsBuys[realReferrer] == 3) && !(referrerSpecialList[realReferrer])){
-     _newTiket( realReferrer, 1); 
+     _newTiket( realReferrer, 1, true); 
      delete referralsBuys[realReferrer];
     }
-
     return realReferrer;
   }
 
@@ -387,5 +385,4 @@ contract Lotery is Ownable, Pausable{
     }
     return RealReferrer;
   }
-  
 }
