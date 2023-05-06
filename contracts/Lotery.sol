@@ -69,19 +69,18 @@ contract Lotery is Ownable, Pausable{
   }  
 
   function buyNumber(address newReferrer, uint _amount) public whenNotPaused {
+    require(msg.sender != newReferrer, "bad referrer");
     uint amount = ticketCost *   _amount;
     ticketCoin.transferFrom(msg.sender, address(this), amount);
     countAddress();
     _newTiket(msg.sender, _amount, false);
-    address ref = referrer[msg.sender];
-
-    if(!(ref == address(0) && newReferrer == msg.sender)){
+    address ref;
+    if(newReferrer != address(0)){
       ref = referralSystem(newReferrer, _amount);
     }else{
       totalFee = totalFee + (amount * stableFee ) / 100;
     }        
     totalPrize = totalPrize + (amount * stablePrize) / 100;
-    
     
     emit BuyNumber(actualNumber-1, msg.sender, ref, loteryCounter);    
   }
@@ -135,9 +134,7 @@ contract Lotery is Ownable, Pausable{
       if(i == 0){ 
         subWinersNumbers[i] = subWinerNumber ; 
         LastAddressWiners.push(ownerOfTiket[subWinersNumbers[i]]);
-      }
-
-      else{
+      }else{
         for(uint j; j < i; j++){                 
           while( LastAddressWiners[j] == ownerOfTiket[subWinerNumber]){
             if (subWinerNumber == actualNumber){ subWinerNumber == 0; }
@@ -347,9 +344,10 @@ contract Lotery is Ownable, Pausable{
     ticketCoin.transfer(realReferrer, ((amount*fee)/100));
 
     //special list cant recive free tikets
-    if((referralsBuys[realReferrer] == 3) && !(referrerSpecialList[realReferrer])){
-     _newTiket( realReferrer, 1, true); 
-     delete referralsBuys[realReferrer];
+    if((referralsBuys[realReferrer] >= 3) && !(referrerSpecialList[realReferrer])){
+      uint freeAmount = referralsBuys[realReferrer]/ 3;
+      _newTiket( realReferrer, freeAmount, true); 
+      referralsBuys[realReferrer] = referralsBuys[realReferrer] % 3;
     }
     return realReferrer;
   }
@@ -365,23 +363,23 @@ contract Lotery is Ownable, Pausable{
     timePlus = newTimePlusSeconds;
   }
 
-  function setReferrer(address newReferrer, uint cant) internal returns(address){
-    address RealReferrer = referrer[msg.sender];
-
-    if(RealReferrer == address(0)){
+  function setReferrer(address newReferrer, uint amount) internal returns(address){
+    address realReferrer = referrer[msg.sender];
+    
+    if(realReferrer == address(0)){
       if(newReferrer != address(0) ){
         referrer[msg.sender] = newReferrer;
         if(referralsAmount[newReferrer] == 0 && !(referrerSpecialList[newReferrer])){
           referralList.push(newReferrer);
         }
-        referralsBuys[newReferrer]++;
-        referralsAmount[newReferrer]+=cant;
-        RealReferrer = newReferrer;
+        referralsBuys[newReferrer] +=amount;
+        referralsAmount[newReferrer]+=amount;
+        realReferrer = newReferrer;
       }
     }else{
-      referralsBuys[RealReferrer]++;
-      referralsAmount[RealReferrer]+=cant;
+      referralsBuys[realReferrer]+=amount;
+      referralsAmount[realReferrer]+=amount;
     }
-    return RealReferrer;
+    return realReferrer;
   }
 }
