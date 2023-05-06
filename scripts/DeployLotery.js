@@ -48,8 +48,10 @@ async function main() {
   })
 
 }
-
+//  npx hardhat run ./scripts/deploy.js  --network mumbai
 main().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });
+
+// Testnet 3/05/23

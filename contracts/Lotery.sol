@@ -268,7 +268,7 @@ contract Lotery is Ownable, Pausable{
   }
 
   function viewUserData(address user) public view returns(
-    bool,uint, uint, address, uint[] memory, uint[] memory, uint[] memory, uint[] memory 
+    bool, uint, uint, address, uint[] memory, uint[] memory, uint[] memory
   ){
     return (
       referrerSpecialList[user], 
@@ -277,8 +277,7 @@ contract Lotery is Ownable, Pausable{
       referrer[user],
       historicalTiketsOwner[loteryCounter][user],
       historicalTiketsOwner[loteryCounter-1][user],
-      historicalTiketsFree[loteryCounter][user],
-      historicalTiketsFree[loteryCounter-1][user]
+      historicalTiketsFree[loteryCounter][user]
     );
   }
   
