@@ -1,5 +1,15 @@
 const hre = require("hardhat");
 require('dotenv').config();
+const fs = require("fs");
+
+function saveAddressesToFile(addresses) {
+  const data = JSON.stringify(addresses);
+  fs.writeFileSync("addresses.json", data);
+}
+const addresses = {
+  lotery: "",
+  randomGenerator: ""
+};
 
 const MUMBAI_PRIVATE_KEY = process.env.MUMBAI_PRIVATE_KEY;
 
@@ -9,7 +19,6 @@ async function main() {
   provider.getSigner(signer.address);
   console.log(signer.toString());
 
-  //
   const tiketCost = ethers.utils.parseEther("1"); // 1000 token
   const stableFee = "40";  
   const house = "0xe027625a79C62E2967a4Ac3B5aA11a7a07cca7fd"; 
@@ -47,6 +56,10 @@ async function main() {
     constructorArguments:[tiketCost,stableFee,house,percentForWiners, RandomGenerator,ticketCoin],
   })
 
+
+  addresses.lotery = lotery.address;
+  addresses.randomGenerator = randomGenerator.address;
+  saveAddressesToFile(addresses);
 }
 //  npx hardhat run ./scripts/deploy.js  --network mumbai
 main().catch((error) => {
