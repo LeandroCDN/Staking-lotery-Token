@@ -3,7 +3,7 @@ require('dotenv').config();
 //https://mumbai.polygonscan.com/address/0x64177A1976C8B10B54d4bB311Fa193f6143e17F5#code
 
 async function main() {
-  const lotery = "0x9ecDA506CA9A2ce6d8b32ED99F7390327407e6e6"; 
+  const lotery = "0xE30176Bbc20e067Dea2692D873358f92D2C02956"; 
   
   const Players = await hre.ethers.getContractFactory("CreatePlayersInLotery", {
     optimizer: {

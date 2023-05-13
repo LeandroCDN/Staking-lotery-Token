@@ -14,7 +14,7 @@ contract Player{
   }
 
   function playLotery(address _lotery, uint cant) public{
-    ILotery(_lotery).buyNumber(address(this),cant);
+    ILotery(_lotery).buyNumber(address(0),cant);
   }
   function playLoterySelecRefer(address refer, address _lotery) public{
     ILotery(_lotery).buyNumber(refer,1);
@@ -74,8 +74,6 @@ contract CreatePlayersInLotery{
   function SLoteryAdrress(address _lotery)public {
     loteryAdrress = _lotery;
   }
-
-  //VIEW FUNCTIONS
   function VTotalPlayers() external view returns(uint){
     return players.length;
   }

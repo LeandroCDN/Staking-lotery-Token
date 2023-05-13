@@ -21,8 +21,8 @@ contract Lotery is Ownable, Pausable{
   uint public totalTiketSell;
   uint public totalTiketFree;
   uint public totalFee;
-  uint public time;
-  uint public timePlus;
+  uint public time =  block.timestamp;
+  uint public timePlus = 1 hours;
 
   uint[] public winersNumbers; 
   uint[] public percentForWiners;
@@ -74,8 +74,8 @@ contract Lotery is Ownable, Pausable{
     ticketCoin.transferFrom(msg.sender, address(this), amount);
     countAddress();
     _newTiket(msg.sender, _amount, false);
-    address ref;
-    if(newReferrer != address(0)){
+    address ref = referrer[msg.sender];
+    if(ref != address(0) || newReferrer != address(0)){
       ref = referralSystem(newReferrer, _amount);
     }else{
       totalFee = totalFee + (amount * stableFee ) / 100;
@@ -87,18 +87,21 @@ contract Lotery is Ownable, Pausable{
   
   function selectNumbers() public {
     require(msg.sender == caller, "You dont are de caller");    
-    require(actualNumber >= minNumber, "actual number is down");
-    require(cantOfAddress > minNumberOfAddress, "need more diferents buyers");
-    
-    vrf.requestRandomWords(cantOfNumbers);
+    require(time < block.timestamp, "need more time");
+    time =  block.timestamp + timePlus;
+
+    if(cantOfAddress > minNumberOfAddress){
+      require(actualNumber >= minNumber, "actual number is down");
+      vrf.requestRandomWords(cantOfNumbers);
+    }
   }
 
   function finishPlay(uint[] memory randomNumber) public {
     require(msg.sender == address(vrf), "You dont are de caller");
     require(actualNumber >= minNumber, "actual number is down");
     require(cantOfAddress > minNumberOfAddress, "need more diferents buyers");
-    require(time < block.timestamp, "need more time");
-    time =  block.timestamp + timePlus;
+    //require(time < block.timestamp, "need more time");
+    //time =  block.timestamp + timePlus;
     winersNumbers = winersVerifications(randomNumber);
    
     for(uint i; i < LastAddressWiners.length; i++){       
@@ -126,24 +129,29 @@ contract Lotery is Ownable, Pausable{
     uint[]  memory subWinersNumbers = randomNumber;
     for(uint i; i < randomNumber.length; i++){
       uint subWinerNumber = (randomNumber[i] % actualNumber);
-
       if (subWinerNumber == 0) {
         subWinerNumber++;
       }
-      
       if(i == 0){ 
         subWinersNumbers[i] = subWinerNumber ; 
         LastAddressWiners.push(ownerOfTiket[subWinersNumbers[i]]);
       }else{
-        for(uint j; j < i; j++){                 
+        bool change;
+        for(uint j; j < i; j++){  
           while( LastAddressWiners[j] == ownerOfTiket[subWinerNumber]){
-            if (subWinerNumber == actualNumber){ subWinerNumber == 0; }
             subWinerNumber++;
+            if (subWinerNumber == actualNumber){ subWinerNumber = 1; }
+            change = true;
           }          
-
-          while(LastAddressWiners[0] == ownerOfTiket[subWinerNumber]){
-            if (subWinerNumber == actualNumber){ subWinerNumber == 0; }
+          while( LastAddressWiners[0] == ownerOfTiket[subWinerNumber]){
             subWinerNumber++;
+            if (subWinerNumber == actualNumber){ subWinerNumber = 1; }
+            change = true;
+          }          
+         
+          if(change){
+            j=0;
+            change = false;
           }
         }
         subWinersNumbers[i]=subWinerNumber;
